@@ -25,6 +25,7 @@ package common
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/facebook/openbmc/tools/flashy/lib/fileutils"
 	"github.com/facebook/openbmc/tools/flashy/lib/step"
@@ -76,7 +77,7 @@ func alertUpgradeMode(stepParams step.StepParams) step.StepExitError {
 var wallAlert = func() error {
 	escapedMsg := strings.ReplaceAll(motdContents, "\n", "\\n")
 	wallCmd := []string{"bash", "-c", fmt.Sprintf("echo -en \"%v\" | wall", escapedMsg)}
-	_, err, _, _ := utils.RunCommand(wallCmd, 30)
+	_, err, _, _ := utils.RunCommand(wallCmd, 30*time.Second)
 	if err != nil {
 		return errors.Errorf("Warning: `wall` alert failed: %v", err)
 	}
@@ -84,7 +85,9 @@ var wallAlert = func() error {
 }
 
 var updateMOTD = func() error {
-	err := fileutils.WriteFile("/etc/motd", []byte(motdContents), 0644)
+	err := fileutils.WriteFileWithTimeout(
+		"/etc/motd", []byte(motdContents), 0644, 5*time.Second,
+	)
 	if err != nil {
 		return errors.Errorf("Warning: MOTD update failed: %v", err)
 	}

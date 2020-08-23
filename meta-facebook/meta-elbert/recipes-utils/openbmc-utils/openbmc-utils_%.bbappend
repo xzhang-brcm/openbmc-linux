@@ -21,7 +21,9 @@ SRC_URI += "file://board-utils.sh \
             file://bios_util.sh \
             file://fpga_util.sh \
             file://fpga_ver.sh \
+            file://dump_pim_serials.sh \
             file://eth0_mac_fixup.sh \
+            file://hclk_fixup.sh \
             file://oob-eeprom-util.sh \
             file://oob-mdio-util.sh \
             file://power-on.sh \
@@ -32,6 +34,8 @@ SRC_URI += "file://board-utils.sh \
             file://setup_i2c.sh \
             file://seutil \
             file://dpm_ver.sh \
+            file://show_tech.py \
+            file://psu_show_tech.py \
             file://pim_enable.sh \
            "
 
@@ -40,6 +44,7 @@ OPENBMC_UTILS_FILES += " \
     bios_util.sh \
     fpga_util.sh \
     fpga_ver.sh \
+    dump_pim_serials.sh \
     oob-eeprom-util.sh \
     oob-mdio-util.sh \
     wedge_power.sh \
@@ -47,6 +52,8 @@ OPENBMC_UTILS_FILES += " \
     setup_i2c.sh \
     seutil \
     dpm_ver.sh \
+    show_tech.py \
+    psu_show_tech.py \
     pim_enable.sh \
     "
 
@@ -73,6 +80,10 @@ do_install_board() {
 
     install -m 755 setup_i2c.sh ${D}${sysconfdir}/init.d/setup_i2c.sh
     update-rc.d -r ${D} setup_i2c.sh start 60 S .
+
+    # ELBERTTODO Remove P1 Hacks
+    install -m 755 hclk_fixup.sh ${D}${sysconfdir}/init.d/hclk_fixup.sh
+    update-rc.d -r ${D} hclk_fixup.sh start 70 S .
 
     # networking is done after rcS, any start level within rcS for
     # mac fixup should work

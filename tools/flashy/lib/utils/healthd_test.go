@@ -93,11 +93,11 @@ func TestGetHealthdConfig(t *testing.T) {
 }
 
 func TestHealthdRemoveMemUtilRebootEntryIfExists(t *testing.T) {
-	// save and defer restore WriteFile and RestartHealthd
-	writeFileOrig := fileutils.WriteFile
+	// save and defer restore WriteFileWithTimeout and RestartHealthd
+	writeFileOrig := fileutils.WriteFileWithTimeout
 	restartHealthdOrig := RestartHealthd
 	defer func() {
-		fileutils.WriteFile = writeFileOrig
+		fileutils.WriteFileWithTimeout = writeFileOrig
 		RestartHealthd = restartHealthdOrig
 	}()
 
@@ -209,7 +209,7 @@ func TestHealthdRemoveMemUtilRebootEntryIfExists(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			writeConfigCalled := false
-			fileutils.WriteFile = func(filename string, data []byte, perm os.FileMode) error {
+			fileutils.WriteFileWithTimeout = func(filename string, data []byte, perm os.FileMode, timeout time.Duration) error {
 				writeConfigCalled = true
 				return tc.writeConfigErr
 			}
@@ -241,10 +241,10 @@ func TestHealthdRemoveMemUtilRebootEntryIfExists(t *testing.T) {
 }
 
 func TestHealthdWriteConfigToFile(t *testing.T) {
-	// save and defer restore WriteFile
-	writeFileOrig := fileutils.WriteFile
+	// save and defer restore WriteFileWithTimeout
+	writeFileOrig := fileutils.WriteFileWithTimeout
 	defer func() {
-		fileutils.WriteFile = writeFileOrig
+		fileutils.WriteFileWithTimeout = writeFileOrig
 	}()
 
 	cases := []struct {
@@ -267,7 +267,7 @@ func TestHealthdWriteConfigToFile(t *testing.T) {
 	mockGabsContainer := gabs.Container{}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			fileutils.WriteFile = func(filename string, data []byte, perm os.FileMode) error {
+			fileutils.WriteFileWithTimeout = func(filename string, data []byte, perm os.FileMode, timeout time.Duration) error {
 				return tc.writeFileErr
 			}
 			got := HealthdWriteConfigToFile(&mockGabsContainer)
@@ -355,14 +355,11 @@ func TestRestartHealthd(t *testing.T) {
 				}
 				return tc.pathExists
 			}
-			RunCommand = func(cmdArr []string, timeoutInSeconds int) (int, error, string, string) {
+			RunCommand = func(cmdArr []string, timeout time.Duration) (int, error, string, string) {
 				wantCmd := fmt.Sprintf("%v restart healthd", tc.supervisor)
 				gotCmd := strings.Join(cmdArr, " ")
 				if wantCmd != gotCmd {
 					t.Errorf("command: want '%v' got '%v'", wantCmd, gotCmd)
-				}
-				if timeoutInSeconds != 60 {
-					t.Errorf("timeout: want 60 got %v", timeoutInSeconds)
 				}
 				// exit code ignored
 				return 0, tc.runCmdErr, "", ""

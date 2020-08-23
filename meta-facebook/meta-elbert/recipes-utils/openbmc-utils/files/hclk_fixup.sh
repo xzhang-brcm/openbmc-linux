@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright 2020-present Facebook. All Rights Reserved.
 #
@@ -16,44 +16,26 @@
 # Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor,
 # Boston, MA 02110-1301 USA
+#
 
 ### BEGIN INIT INFO
-# Provides:          power-on
+# Provides:          hclk_fixup
 # Required-Start:
 # Required-Stop:
 # Default-Start:     S
 # Default-Stop:
-# Short-Description: Power on micro-server
+# Short-Description:  Set up protype HCLK hacks
 ### END INIT INFO
 
 # shellcheck disable=SC1091
 . /usr/local/bin/openbmc-utils.sh
 
-PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin
+# units that require this workaround
+matchRegex='JAS20240010|JAS20240013'
 
-# Only run board power up sequence is CPU is not up, otherwise this could
-# disrupt data plane
-if wedge_is_us_on; then
-    echo "uServer is already up. Skipping board power-on sequence"
-else
-    echo "uServer is not up. Running board power-on sequence"
-    wedge_power_on_board
+# get the MAC from Elbert SCM BMC EEPROM
+if weutil bmc | grep -q -E "$matchRegex"; then
+    # AST2620 SCU350 BIT31: RGMII select Internal PLL for MAC3/MAC4
+    echo 'Running HCLK workaround for BMC...'
+    devmem_set_bit $((0x1E6E2000 + 0x350)) 31
 fi
-
-# Now, double check if power is on, and do forced power up as needed.
-echo "Checking microserver power status ... "
-if wedge_is_us_on; then
-    echo "on"
-    on=1
-else
-    echo "off"
-    on=0
-fi
-
-if [ $on -eq 0 ]; then
-    # Power on now
-    echo "uServer still not up. Running forced power-up sequence"
-    wedge_power.sh on -f
-fi
-
-pim_enable.sh > /dev/null 2>&1 &

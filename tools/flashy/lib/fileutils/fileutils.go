@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -50,8 +51,8 @@ var Pagesize = os.Getpagesize()
 var osStat = os.Stat
 var RemoveFile = os.Remove
 var TruncateFile = os.Truncate
-var WriteFile = ioutil.WriteFile
 var ReadFile = ioutil.ReadFile
+var WriteFile = ioutil.WriteFile // prefer WriteFileWithTimeout
 var RenameFile = os.Rename
 var CreateFile = os.Create
 var Mmap = syscall.Mmap
@@ -252,4 +253,50 @@ var GetPageOffsettedBase = func(addr uint32) uint32 {
 // address that is smaller or equals to addr.
 var GetPageOffsettedOffset = func(addr uint32) uint32 {
 	return addr & uint32(Pagesize-1)
+}
+
+// OpenFileWithLock opens an existing file and acquires a lock for it.
+var OpenFileWithLock = func(filename string, flag int, how int) (*os.File, error) {
+	f, err := os.OpenFile(filename, flag, 0)
+	if err != nil {
+		return f, err
+	}
+	err = syscall.Flock(int(f.Fd()), how)
+	if err != nil {
+		// close the file
+		f.Close()
+		return f, err
+	}
+	return f, err
+}
+
+// CloseFileWithUnlock closes unlocks the lock on a file and closes it.
+var CloseFileWithUnlock = func(f *os.File) error {
+	err := syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+// WriteFileWithTimeout wraps ioutil.WriteFile with a timeout.
+var WriteFileWithTimeout = func(
+	filename string,
+	data []byte,
+	perm os.FileMode,
+	timeout time.Duration,
+) error {
+	c := make(chan error, 1)
+
+	go func() {
+		err := WriteFile(filename, data, perm)
+		c <- err
+	}()
+
+	select {
+	case res := <-c:
+		return res
+	case <-time.After(timeout):
+		return errors.Errorf("Timed out after '%v'", timeout)
+	}
 }
